@@ -31,11 +31,11 @@ LABEL org.opencontainers.image.title="aceest-fitness" \
 RUN useradd --create-home --uid 10001 appuser \
     && mkdir -p /data && chown appuser:appuser /data
 COPY --chown=appuser:appuser aceest/ aceest/
-COPY --chown=appuser:appuser ACEest_Fitness.py .
+COPY --chown=appuser:appuser ACEest_Fitness.py gunicorn.conf.py ./
 USER appuser
 ENV PORT=5000 \
     ACEEST_DB=/data/aceest_fitness.db
 EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=2)" || exit 1
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--access-logfile", "-", "ACEest_Fitness:app"]
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "ACEest_Fitness:app"]

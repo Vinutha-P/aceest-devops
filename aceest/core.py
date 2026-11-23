@@ -1,8 +1,15 @@
-"""Core routes: dashboard page, health check and version information."""
+"""Core routes and cross-cutting behaviour.
+
+- dashboard page, liveness (/health), readiness (/ready) and /version
+- response headers identifying the version / deployment track that served a request
+  (used to observe blue-green, canary, A/B and shadow traffic splitting)
+"""
 import socket
+import sqlite3
 
 from flask import Blueprint, current_app, jsonify, render_template
 
+from .db import get_db
 from .programs import PROGRAMS
 from .version import __version__
 
@@ -19,6 +26,14 @@ def version_info():
     }
 
 
+@bp.after_app_request
+def add_deployment_headers(response):
+    response.headers["X-App-Version"] = __version__
+    response.headers["X-Deployment-Track"] = current_app.config["DEPLOYMENT_TRACK"]
+    response.headers["X-Served-By"] = socket.gethostname()
+    return response
+
+
 @bp.get("/")
 def index():
     return render_template("index.html", info=version_info(), programs=PROGRAMS)
@@ -28,6 +43,17 @@ def index():
 def health():
     """Liveness probe - the process is up and serving requests."""
     return jsonify(status="ok")
+
+
+@bp.get("/ready")
+def ready():
+    """Readiness probe - the app can reach its database and may receive traffic."""
+    try:
+        get_db().execute("SELECT 1").fetchone()
+    except sqlite3.Error as exc:
+        current_app.logger.warning("Readiness check failed: %s", exc)
+        return jsonify(status="unavailable", reason="database"), 503
+    return jsonify(status="ready", version=__version__)
 
 
 @bp.get("/version")

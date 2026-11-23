@@ -20,7 +20,10 @@ SCHEMA = [
         weight REAL,
         program TEXT,
         calories INTEGER,
-        notes TEXT DEFAULT ''
+        notes TEXT DEFAULT '',
+        height REAL,
+        target_weight REAL,
+        target_adherence INTEGER
     )
     """,
     """
@@ -98,7 +101,13 @@ def migrate(db):
     added = []
     for table, column, ddl in MIGRATIONS:
         if column not in existing_columns(db, table):
-            db.execute(ddl)
+            try:
+                db.execute(ddl)
+            except sqlite3.OperationalError as exc:
+                # another worker/pod added it between our check and the ALTER
+                if "duplicate column" not in str(exc):
+                    raise
+                continue
             added.append(f"{table}.{column}")
     return added
 
