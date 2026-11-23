@@ -1,0 +1,47 @@
+# Local CI stack: Jenkins + SonarQube
+#   docker compose -f jenkins/docker-compose.yml up -d --build
+# Jenkins   -> http://localhost:8080
+# SonarQube -> http://localhost:9000   (first login admin / admin)
+name: aceest-ci
+
+services:
+  jenkins:
+    build: .
+    image: aceest-jenkins:latest
+    container_name: jenkins
+    # root lets the Jenkins container use the host Docker socket.
+    # Acceptable for a local lab; use a dedicated build agent in production.
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [ci]
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube
+    environment:
+      # avoids the vm.max_map_count requirement of the embedded Elasticsearch
+      SONAR_SEARCH_JAVAADDITIONALOPTS: "-Dnode.store.allow_mmap=false"
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks: [ci]
+    restart: unless-stopped
+
+networks:
+  ci:
+    name: aceest-ci
+
+volumes:
+  jenkins_home:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
