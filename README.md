@@ -15,7 +15,273 @@ with **rolling, blue-green, canary, A/B and shadow** deployments and automatic r
 
 ---
 
-## 1. Architecture
+## 1. Step-by-step guide
+
+Follow the steps in order. Each step that differs by operating system shows **Windows**
+(PowerShell), **macOS** (Terminal) and **Ubuntu** (Terminal). Replace anything in
+`<angle brackets>` with your own value.
+
+> **Windows:** the `scripts/*.sh` files run in **Git Bash** (installed with Git: right-click the
+> project folder → *Open Git Bash here*). Everything else runs in PowerShell.
+> In PowerShell, `curl` means something different, so type **`curl.exe`** instead.
+
+### Step 1: Install the tools
+
+You need Git, Python 3.12, Docker, kubectl, Minikube and the GitHub CLI. Give Docker at
+least **8 GB RAM and 4 CPUs**.
+
+**Windows** (PowerShell as Administrator, then restart Windows):
+```powershell
+winget install -e --id Git.Git
+winget install -e --id Python.Python.3.12
+winget install -e --id Docker.DockerDesktop
+winget install -e --id Kubernetes.kubectl
+winget install -e --id Kubernetes.minikube
+winget install -e --id GitHub.cli
+```
+Then open Docker Desktop → Settings → Resources → 8 GB / 4 CPUs.
+
+**macOS** (needs [Homebrew](https://brew.sh)):
+```bash
+brew install git python@3.12 kubectl minikube gh
+brew install --cask docker
+```
+Then open Docker Desktop → Settings → Resources → 8 GB / 4 CPUs. Under Settings → Advanced,
+keep "Allow the default Docker socket to be used" ticked.
+
+**Ubuntu:**
+```bash
+sudo apt update && sudo apt install -y git curl python3 python3-venv python3-pip gh
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker "$USER"          # then log out and back in
+curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install kubectl /usr/local/bin/kubectl && rm kubectl
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+```
+
+Check that everything is installed (all operating systems):
+```bash
+git --version; docker --version; docker compose version
+kubectl version --client; minikube version; gh --version
+docker run --rm hello-world               # prints "Hello from Docker!"
+```
+
+### Step 2: Set up Git and GitHub
+
+```bash
+git config --global user.name  "<Your Name>"
+git config --global user.email "<your-github-email>"
+gh auth login                             # GitHub.com -> HTTPS -> Login with a web browser
+```
+
+Create these two accounts and repositories:
+- **GitHub:** an empty **public** repository named `aceest-devops`, with no README and no licence.
+- **Docker Hub:** a **public** repository named `aceest-fitness`. Also create a personal access
+  token with *Read & Write* access (Account settings → Personal access tokens) and save it.
+
+### Step 3: Run the tests
+
+Open a terminal in the project folder.
+
+| | Windows (PowerShell) | macOS / Ubuntu |
+|---|---|---|
+| Create the venv | `python -m venv .venv` | `python3 -m venv .venv` |
+| Activate it | `Set-ExecutionPolicy -Scope Process Bypass`<br>`.venv\Scripts\activate` | `source .venv/bin/activate` |
+| Make the scripts executable | – | `chmod +x scripts/*.sh` |
+
+Then, on all operating systems:
+```bash
+pip install -r requirements-dev.txt
+pytest -v                                         # 238 tests pass
+pytest --cov=aceest --cov-report=term-missing     # 100 % coverage
+flake8                                            # no output = no lint errors
+```
+If `pytest` is "not recognized", the venv isn't activated. Run the activate line again, or
+use `python -m pytest -v`.
+
+### Step 4: Run the app locally
+
+| Windows (PowerShell) | macOS / Ubuntu |
+|---|---|
+| `$env:ACEEST_ADMIN_PASSWORD = "ChangeMe123"`<br>`python ACEest_Fitness.py` | `export ACEEST_ADMIN_PASSWORD=ChangeMe123`<br>`python3 ACEest_Fitness.py` |
+
+Open http://localhost:5000 (the dashboard) and http://localhost:5000/version. Press **Ctrl+C**
+to stop.
+- If port 5000 is busy, run it on 5050 instead: `PORT=5050` on macOS/Ubuntu, or
+  `$env:PORT = "5050"` on Windows. On a Mac, AirPlay Receiver uses port 5000.
+- If you can't log in as `admin` with ChangeMe123, delete the old `instance/` folder and start
+  the app again.
+
+### Step 5: Build and run the Docker image
+
+```bash
+docker build --target test -t aceest-fitness:test .
+docker run --rm aceest-fitness:test               # the tests run inside the container
+
+docker build -t aceest-fitness:3.2.4 .
+docker run -d --name aceest -p 8000:5000 -e ACEEST_ADMIN_PASSWORD=ChangeMe123 aceest-fitness:3.2.4
+docker ps                                         # "(healthy)" after about 30 s
+docker exec aceest id                             # uid=10001(appuser), not root
+curl http://localhost:8000/version                # Windows: curl.exe
+docker rm -f aceest
+```
+If you get "container name is already in use", run `docker rm -f aceest` and try again.
+
+### Step 6: Start Jenkins and SonarQube
+
+```bash
+docker compose -f jenkins/docker-compose.yml up -d --build    # first run takes 5-10 min
+docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+```
+
+**SonarQube** at http://localhost:9000:
+1. Log in as `admin` / `admin` and set a new password.
+2. Go to My Account → Security → Generate Token (name `jenkins`, type *Global Analysis*) and save the token.
+3. Go to Administration → Configuration → Webhooks → Create, with URL `http://jenkins:8080/sonarqube-webhook/`.
+
+**Jenkins** at http://localhost:8080:
+1. Paste the unlock password, choose **Install suggested plugins** and create your admin user.
+2. Go to Manage Jenkins → System and set these:
+   - **Global properties → Environment variables:** add `DOCKERHUB_USER` = `<your Docker Hub username>`.
+   - **SonarQube servers:** set Name `SonarQube` and URL `http://sonarqube:9000`. For the
+     token, add a *Secret text* credential containing the SonarQube token, with ID `sonarqube-token`.
+3. Go to Manage Jenkins → Credentials → Add Credentials. Choose *Username with password*: your
+   Docker Hub username, with the Docker Hub token as the password. Set the ID to `dockerhub`.
+
+### Step 7: Start Minikube and connect it to Jenkins
+
+```bash
+minikube start --driver=docker --cpus=4 --memory=4g
+minikube addons enable ingress
+kubectl config current-context                    # must print: minikube
+```
+In Git Bash on Windows, or Terminal on macOS/Ubuntu:
+```bash
+scripts/jenkins-kubeconfig.sh                     # writes jenkins/kubeconfig-minikube
+ACEEST_ADMIN_PASSWORD='ChangeMe123' scripts/ensure-secret.sh
+```
+Then in Jenkins go to Credentials → Add Credentials → *Secret file*. Upload
+`jenkins/kubeconfig-minikube` with ID `kubeconfig`.
+
+### Step 8: Push to GitHub through pull requests
+
+The publish script pushes `main`, then opens one pull request per version and merges it in order
+(v1.1 → … → v3.2.4 → docs). It tags each release as it goes.
+
+| Windows (PowerShell) | macOS / Ubuntu |
+|---|---|
+| `Set-ExecutionPolicy -Scope Process Bypass`<br>`.\scripts\publish-to-github.ps1 -RepoUrl https://github.com/<github-user>/aceest-devops.git` | `scripts/publish-to-github.sh https://github.com/<github-user>/aceest-devops.git` |
+
+When the script pauses after pushing `main`, set up the Jenkins jobs:
+1. Create the pipeline job: Jenkins → New Item → `aceest-fitness` → **Pipeline**. Choose
+   *Pipeline script from SCM* → Git, enter your repository URL, set Branch `*/main` and Script
+   Path `Jenkinsfile`, then Save.
+2. Click **Build Now**. When the build is green, press Enter in the terminal.
+3. After each merge the script pauses again. Wait for that Jenkins build, then press Enter.
+4. Create a second job named `aceest-rollback` with the same repository and Script Path
+   `jenkins/Jenkinsfile.rollback`.
+
+To do it by hand instead: on GitHub open a pull request with **base: `main`** and
+**compare: `feature/v1.1-client-profile`**, then merge it. Repeat for each next branch, in the
+order of the [version history](#4-version-history), ending with `docs/project-documentation`.
+After each merge, tag the release:
+`git fetch origin; git tag -a v1.1 origin/main -m "Release v1.1"; git push origin v1.1`.
+
+### Step 9: Deploy every strategy
+
+The `rolling` strategy deploys automatically. For each of the other four, open Jenkins →
+`aceest-fitness` → **Build with Parameters**, set `DEPLOY_STRATEGY`, and build. Do this for
+`blue-green`, `canary`, `ab` and `shadow`.
+
+```bash
+kubectl -n aceest get deploy,svc,ingress,pods -o wide
+```
+
+Find the cluster URL for your system:
+
+| Windows | macOS | Ubuntu |
+|---|---|---|
+| Run `minikube tunnel` in an **Administrator** PowerShell and leave it open. The URL is `http://127.0.0.1`. | Run `minikube tunnel` in a new Terminal tab (it asks for your password) and leave it open. The URL is `http://127.0.0.1`. | No tunnel is needed. The URL is `http://$(minikube ip)`. |
+
+```bash
+URL=http://127.0.0.1                              # Ubuntu: URL=http://$(minikube ip)
+curl $URL/version                                 # rolling
+curl $URL/bluegreen/version                       # blue-green
+for i in $(seq 1 20); do curl -s $URL/canary/version; echo; done   # roughly 80 % stable, 20 % canary
+curl -H "X-Variant: B" $URL/ab/version            # A/B testing: variant B
+curl $URL/shadow/version                          # shadow: users only see the primary
+kubectl -n aceest logs deploy/aceest-shadow-new --tail=5           # requests mirrored to the shadow
+scripts/demo-strategies.sh                        # saves everything to docs/evidence/
+```
+
+### Step 10: Test rollback
+
+```bash
+ROLLOUT_TIMEOUT=60s scripts/deploy.sh rolling <dockerhub-user>/aceest-fitness:does-not-exist
+#   -> prints "ROLLING BACK ..." and the previous version keeps serving
+kubectl -n aceest rollout history deployment/aceest-rolling
+scripts/rollback.sh blue-green                    # manual rollback (instant selector switch)
+```
+You can also run a manual rollback from Jenkins: `aceest-rollback` → Build with Parameters →
+`blue-green`.
+
+### Step 11: Collect the evidence and submit
+
+1. Export the SonarQube report:
+   ```bash
+   SONAR_TOKEN=<sonarqube-token> scripts/sonar-report.sh       # docs/evidence/sonarqube-report.md
+   ```
+2. Take the screenshots listed in [docs/EVIDENCE-CHECKLIST.md](docs/EVIDENCE-CHECKLIST.md) and
+   save them in `docs/evidence/`. Use Win+Shift+S on Windows, Cmd+Shift+4 on macOS, or the
+   PrtSc key on Ubuntu.
+3. Commit the evidence through one more pull request:
+   ```bash
+   git checkout main && git pull                  # PowerShell: use ; instead of &&
+   git checkout -b docs/execution-evidence
+   git add docs/evidence
+   git commit -m "docs: execution evidence"
+   git push -u origin docs/execution-evidence
+   gh pr create --base main --title "docs: execution evidence" --body "Screenshots and outputs"
+   gh pr merge --merge
+   ```
+4. Optional public URL: run `ngrok http 80` while `minikube tunnel` is running. On Ubuntu, run
+   `ngrok http $(minikube ip):80` instead.
+5. Fill in your name, ID and screenshots in `docs/ACEest_DevOps_Report.docx`. Then submit the
+   report, your GitHub repository URL, your Docker Hub repository URL and the endpoint URL.
+
+### After a restart
+
+```bash
+# start Docker Desktop first (Windows/macOS), then:
+minikube start
+docker start jenkins sonarqube
+```
+If Minikube's IP changed, re-run `scripts/jenkins-kubeconfig.sh` and upload the new
+`kubeconfig` credential to Jenkins.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `pytest` / `flake8` not recognized | Activate the venv (step 3) or use `python -m pytest` |
+| `running scripts is disabled` (Windows) | `Set-ExecutionPolicy -Scope Process Bypass` |
+| `python: command not found` (macOS/Ubuntu) | Use `python3` |
+| `permission denied` running a script | `chmod +x scripts/*.sh` |
+| Port 5000 already in use | Use port 5050 (step 4) or `-p 8000:5000` for Docker |
+| SonarQube stops after a minute | Give Docker 8 GB RAM |
+| Jenkins: `DOCKERHUB_USER is not set` | Step 6, Jenkins point 2 |
+| Quality Gate stage waits forever | The SonarQube webhook is missing (step 6, SonarQube point 3) |
+| Deploy stage can't reach Kubernetes | Re-run `scripts/jenkins-kubeconfig.sh` and re-upload `kubeconfig` |
+| Pods in `ImagePullBackOff` | The image isn't on Docker Hub yet, or the repository is private |
+| `[safety] kubectl context is ...` | `kubectl config use-context minikube` |
+| `http://127.0.0.1` doesn't answer | `minikube tunnel` must be running (Windows/macOS) |
+
+Each phase is explained in more detail in [docs/SUBMISSION-GUIDE.md](docs/SUBMISSION-GUIDE.md).
+
+---
+
+## 2. Architecture
 
 ```mermaid
 flowchart LR
@@ -43,7 +309,7 @@ Every deployment exposes `/version` and the response headers `X-App-Version`,
 `X-Deployment-Track` and `X-Served-By`, so you can see exactly which version and pod served
 each request.
 
-## 2. Repository layout
+## 3. Repository layout
 
 ```
 ACEest_Fitness.py          entry point (gunicorn ACEest_Fitness:app)
@@ -72,7 +338,7 @@ sonar-project.properties   SonarQube configuration
 docs/                      submission guide, evidence checklist, report
 ```
 
-## 3. Version history
+## 4. Version history
 
 Each Tkinter release in `legacy_tkinter/` was re-implemented as a web version on its own branch,
 merged through a pull request and tagged.
@@ -90,41 +356,7 @@ merged through a pull request and tagged.
 | v3.1.2 | `feature/v3.1.2-auth-ai-pdf` | Login (hashed passwords, signed tokens), AI program generator, PDF report |
 | v3.2.4 | `feature/v3.2.4-membership-roles` | Membership tracking, Admin/Trainer roles |
 
-## 4. Run locally
-
-```powershell
-python -m venv .venv
-.venv\Scripts\activate                      # Linux/macOS: source .venv/bin/activate
-pip install -r requirements-dev.txt
-$env:ACEEST_ADMIN_PASSWORD = "ChangeMe123"  # Linux/macOS: export ACEEST_ADMIN_PASSWORD=ChangeMe123
-python ACEest_Fitness.py                    # http://localhost:5000
-```
-
-### Run the tests
-
-```powershell
-pytest                                            # 238 tests
-pytest --cov=aceest --cov-report=term-missing     # with coverage
-flake8                                            # lint
-```
-
-## 5. Docker
-
-```powershell
-docker build -t aceest-fitness:3.2.4 .                         # runtime image (non-root)
-docker run -p 5000:5000 -e ACEEST_ADMIN_PASSWORD=ChangeMe123 aceest-fitness:3.2.4
-
-docker build --target test -t aceest-fitness:test .             # tests inside the container
-docker run --rm aceest-fitness:test
-```
-
-Build and push **all versions** from their Git tags (Git Bash):
-
-```bash
-DOCKERHUB_USER=<you> scripts/build-all-versions.sh
-```
-
-## 6. CI/CD pipeline (Jenkins)
+## 5. CI/CD pipeline (Jenkins)
 
 `Jenkinsfile` stages:
 
@@ -148,7 +380,7 @@ and `CANARY_WEIGHT`. A second job (`jenkins/Jenkinsfile.rollback`) rolls back on
 Local Jenkins + SonarQube: `docker compose -f jenkins/docker-compose.yml up -d --build`
 (full setup in [docs/SUBMISSION-GUIDE.md](docs/SUBMISSION-GUIDE.md)).
 
-## 7. Kubernetes deployment strategies
+## 6. Kubernetes deployment strategies
 
 All strategies live in namespace `aceest` behind **one ingress URL** (path prefixes):
 
@@ -172,7 +404,7 @@ scripts/deploy.sh blue-green <you>/aceest-fitness:3.2.4
 scripts/rollback.sh blue-green
 ```
 
-## 8. API reference
+## 7. API reference
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -197,11 +429,11 @@ Example:
 curl -X POST localhost:5000/api/clients -H "Content-Type: application/json" \
      -d '{"name":"Arun","program":"MG","age":28,"weight":75,"height":175}'
 TOKEN=$(curl -s -X POST localhost:5000/api/auth/login -H "Content-Type: application/json" \
-     -d '{"username":"admin","password":"ChangeMe123"}' | python -c "import json,sys;print(json.load(sys.stdin)['token'])")
+     -d '{"username":"admin","password":"ChangeMe123"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])")   # Windows Git Bash: python
 curl -H "Authorization: Bearer $TOKEN" localhost:5000/api/clients/Arun/report.pdf -o Arun.pdf
 ```
 
-## 9. Configuration
+## 8. Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -213,7 +445,7 @@ curl -H "Authorization: Bearer $TOKEN" localhost:5000/api/clients/Arun/report.pd
 | `URL_PREFIX` | – | path prefix for ingress routing |
 | `GUNICORN_WORKERS` / `GUNICORN_THREADS` | `2` / `2` | server concurrency |
 
-## 10. Documentation
+## 9. Documentation
 
 - [docs/SUBMISSION-GUIDE.md](docs/SUBMISSION-GUIDE.md): step-by-step setup and submission
 - [docs/EVIDENCE-CHECKLIST.md](docs/EVIDENCE-CHECKLIST.md): screenshots and outputs to capture
