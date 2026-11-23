@@ -6,11 +6,11 @@ the [submission guide](SUBMISSION-GUIDE.md)). Each row maps to an assessment poi
 ## Git branching and pull requests
 | # | File name | What to capture |
 |---|---|---|
-| 1 | `01-github-prs-closed.png` | GitHub → Pull requests → *Closed*: the 10 merged PRs |
-| 2 | `02-github-pr-checks.png` | One PR page showing the green **PR checks** and the commit list |
+| 1 | `01-github-branches.png` | GitHub → Branches: `main` + the 10 release branches (`feature/…`, `bugfix/…`, `docs/…`) |
+| 2 | `02-github-evidence-pr.png` | The evidence pull request showing the green **PR checks** and its files |
 | 3 | `03-github-network.png` | Insights → Network graph (feature branches merging into main) |
 | 4 | `04-github-tags.png` | Tags page: v1.0 … v3.2.4 |
-| 5 | `05-github-actions.png` | Actions tab: PR checks runs |
+| 5 | `05-github-actions.png` | Actions tab: green runs for the push to `main` and the evidence PR |
 
 ## Testing
 | # | File name | What to capture |

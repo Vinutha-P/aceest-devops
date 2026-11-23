@@ -14,8 +14,8 @@ SonarQube → Docker Hub → Kubernetes, with five deployment strategies and aut
 ## 2. CI/CD architecture overview
 
 ```
-Developer ─► feature branch ─► Pull Request ─► GitHub Actions "PR checks" (lint, tests, docker)
-                                   │ merge
+Developer ─► feature branch ─► merge to main ─► GitHub Actions checks (lint, tests, docker)
+                                   │
                                    ▼
 GitHub main ──pollSCM (2 min)──► Jenkins pipeline
   Checkout ─► Setup ─► flake8 ─► Pytest + coverage ─► SonarQube scan ─► Quality Gate
@@ -29,7 +29,7 @@ Minikube (namespace aceest) ─ ingress-nginx, one URL:
 | Layer | Implementation |
 |---|---|
 | Application | Flask app factory, 13 modules (programs, clients, tracking, auth, AI program, PDF, membership, users…), SQLite with in-place migrations, gunicorn |
-| Version control | `main` + one branch per release (`feature/…`, `bugfix/…`), merged by PR, tags `v1.0`…`v3.2.4`, conventional commit messages |
+| Version control | `main` + one branch per release (`feature/…`, `bugfix/…`), merged into `main` in release order, tags `v1.0`…`v3.2.4`, conventional commit messages |
 | Testing | 238 Pytest tests, 100 % line coverage; run locally, in GitHub Actions, in Jenkins and **inside the container** |
 | Quality | flake8 + SonarQube (Python analysis, coverage import, quality gate enforced by `waitForQualityGate`) |
 | Build | Multi-stage Dockerfile: `test` stage (runs pytest) and slim **non-root** `runtime` stage with healthcheck |
@@ -65,7 +65,7 @@ duplicates live traffic to the new version; users only see the primary). Every r
 
 | Outcome | Result |
 |---|---|
-| Versions delivered | 10 (v1.0 → v3.2.4), each through a PR, a Jenkins build and a Docker Hub image |
+| Versions delivered | 10 (v1.0 → v3.2.4), each on its own branch and tag, with its own Docker Hub image |
 | Test suite | 238 tests, 100 % coverage, executed 4× per change (local, GitHub Actions, Jenkins, container) |
 | Pipeline | 11 stages, triggered automatically by SCM polling; build time ≈ `<fill in from Jenkins>` min |
 | Quality gate | SonarQube gate **Passed** (`<bugs / vulnerabilities / smells from sonarqube-report.md>`) |
@@ -77,7 +77,7 @@ duplicates live traffic to the new version; users only see the primary). Every r
 ## 5. Conclusion
 
 The project turns a manually-run desktop tool into a continuously delivered web service. Every
-change is version-controlled, peer-reviewable through pull requests, automatically tested, scanned
+change is version-controlled on its own branch, automatically tested, scanned
 for quality and packaged as an immutable image. It reaches users through a controlled strategy
 and can be reverted in seconds. The same pipeline can target a cloud cluster (AKS, EKS or GKE) by
 changing only the kubeconfig credential.

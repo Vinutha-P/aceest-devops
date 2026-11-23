@@ -375,8 +375,8 @@ Each phase is explained in more detail in [docs/SUBMISSION-GUIDE.md](docs/SUBMIS
 
 ```mermaid
 flowchart LR
-    dev[Developer] -->|feature branch + PR| gh[(GitHub)]
-    gh -->|PR status check| gha[GitHub Actions<br/>lint · pytest · docker]
+    dev[Developer] -->|feature branch, merged to main| gh[(GitHub)]
+    gh -->|push / PR check| gha[GitHub Actions<br/>lint · pytest · docker]
     gh -->|pollSCM every 2 min| jk[Jenkins]
     subgraph Jenkins pipeline
       jk --> lint[flake8] --> ut[pytest + coverage] --> sq[SonarQube scan<br/>+ quality gate]
@@ -431,7 +431,7 @@ docs/                      submission guide, evidence checklist, report
 ## 4. Version history
 
 Each Tkinter release in `legacy_tkinter/` was re-implemented as a web version on its own branch,
-merged through a pull request and tagged.
+merged into `main` and tagged.
 
 | Tag | Branch | What it adds |
 |---|---|---|
