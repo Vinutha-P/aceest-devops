@@ -10,7 +10,7 @@ metadata:
     strategy: blue-green
     color: blue
   annotations:
-    kubernetes.io/change-cause: "initial deploy your-dockerhub-username/aceest-fitness:3.0.1"
+    kubernetes.io/change-cause: "initial deploy your-dockerhub-username/aceest-fitness:3.1.2"
 spec:
   replicas: 2
   revisionHistoryLimit: 10
@@ -36,7 +36,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: app
-          image: your-dockerhub-username/aceest-fitness:3.0.1
+          image: your-dockerhub-username/aceest-fitness:3.1.2
           imagePullPolicy: Always
           ports:
             - name: http
@@ -105,7 +105,7 @@ metadata:
     strategy: blue-green
     color: green
   annotations:
-    kubernetes.io/change-cause: "initial deploy your-dockerhub-username/aceest-fitness:3.1.2"
+    kubernetes.io/change-cause: "initial deploy your-dockerhub-username/aceest-fitness:3.2.4"
 spec:
   replicas: 2
   revisionHistoryLimit: 10
@@ -131,7 +131,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: app
-          image: your-dockerhub-username/aceest-fitness:3.1.2
+          image: your-dockerhub-username/aceest-fitness:3.2.4
           imagePullPolicy: Always
           ports:
             - name: http

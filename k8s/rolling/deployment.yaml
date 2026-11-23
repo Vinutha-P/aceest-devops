@@ -9,7 +9,7 @@ metadata:
     app: aceest
     strategy: rolling
   annotations:
-    kubernetes.io/change-cause: "initial deploy your-dockerhub-username/aceest-fitness:3.1.2"
+    kubernetes.io/change-cause: "initial deploy your-dockerhub-username/aceest-fitness:3.2.4"
 spec:
   replicas: 3
   revisionHistoryLimit: 10
@@ -39,7 +39,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: app
-          image: your-dockerhub-username/aceest-fitness:3.1.2
+          image: your-dockerhub-username/aceest-fitness:3.2.4
           imagePullPolicy: Always
           ports:
             - name: http
