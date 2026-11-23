@@ -69,7 +69,9 @@ def export_csv():
     writer = csv.writer(buffer)
     writer.writerow(CSV_HEADER)
     for c in clients:
-        writer.writerow([c["name"], c["age"], c["weight"], c["program"], c["adherence"], c["notes"]])
+        writer.writerow(
+            [c["name"], c["age"], c["weight"], c["program"], c["adherence"], c["notes"]]
+        )
     return Response(
         buffer.getvalue(),
         mimetype="text/csv",
