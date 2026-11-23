@@ -3,6 +3,7 @@
 v1.1   - validate a client profile and estimate calories (Aceestver-1.1)
 v1.1.2 - client list, CSV export and adherence chart data (Aceestver-1.1.2)
 v2.0.1 - clients and weekly progress persisted in SQLite (Aceestver-2.0.1)
+v2.1.2 - range validation and JSON error responses
 """
 import csv
 import io
@@ -12,6 +13,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from .db import get_db
 from .programs import PROGRAMS, estimate_calories
+from .validation import AGE_RANGE, PERCENT_RANGE, WEIGHT_RANGE, json_body, number, text
 
 bp = Blueprint("clients", __name__, url_prefix="/api/clients")
 
@@ -59,22 +61,19 @@ def _log_progress(name, adherence, week=None):
 @bp.post("")
 def save_client():
     """Create or update a client (upsert by name) and return it with the calorie estimate."""
-    data = request.get_json(silent=True) or {}
-    name = str(data.get("name", "")).strip()
-    program = str(data.get("program", "")).strip().upper()
+    data = json_body(request)
+    name = text(data, "name")
+    program = text(data, "program").upper()
     if not name or not program:
         return _error("Please fill client name and program.")
     if program not in PROGRAMS:
         return _error(f"Unknown program '{program}'")
-    try:
-        age = int(data.get("age", 0))
-        weight = float(data.get("weight", 0))
-        adherence = int(data["adherence"]) if data.get("adherence") is not None else None
-    except (TypeError, ValueError):
-        return _error("age, weight and adherence must be numbers")
+    age = number(data, "age", int, default=0, **AGE_RANGE)
+    weight = number(data, "weight", float, default=0.0, **WEIGHT_RANGE)
+    adherence = number(data, "adherence", int, **PERCENT_RANGE)
+    notes = text(data, "notes", max_length=500)
 
     calories = estimate_calories(weight, program) if weight > 0 else None
-    notes = str(data.get("notes", "")).strip()
     existed = _client_row(name) is not None
 
     db = get_db()
@@ -149,11 +148,8 @@ def save_progress(name):
     """Log weekly adherence for a client."""
     if _client_row(name) is None:
         return _error("Client not found", 404)
-    data = request.get_json(silent=True) or {}
-    try:
-        adherence = int(data["adherence"])
-    except (KeyError, TypeError, ValueError):
-        return _error("adherence (number) is required")
-    week = _log_progress(name, adherence, data.get("week"))
+    data = json_body(request)
+    adherence = number(data, "adherence", int, required=True, **PERCENT_RANGE)
+    week = _log_progress(name, adherence, text(data, "week", max_length=30) or None)
     return jsonify(message="Weekly progress logged", client=name, week=week,
                    adherence=adherence), 201
