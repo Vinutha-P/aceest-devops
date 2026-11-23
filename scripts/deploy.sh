@@ -22,6 +22,9 @@ TIMEOUT="${ROLLOUT_TIMEOUT:-180s}"
 CANARY_WEIGHT="${CANARY_WEIGHT:-20}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K8S_DIR="${SCRIPT_DIR}/../k8s"
+# shellcheck source=lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+require_safe_context
 
 # "user/aceest-fitness:3.2.4-b17" -> "3.2.4"
 TAG="${IMAGE##*:}"

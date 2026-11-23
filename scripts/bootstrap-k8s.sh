@@ -6,6 +6,9 @@
 set -euo pipefail
 : "${DOCKERHUB_USER:?set DOCKERHUB_USER to your Docker Hub username}"
 K8S_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../k8s" && pwd)"
+# shellcheck source=lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+require_safe_context
 
 kubectl apply -f "${K8S_DIR}/namespace.yaml"
 bash "${K8S_DIR}/../scripts/ensure-secret.sh"

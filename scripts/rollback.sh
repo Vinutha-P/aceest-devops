@@ -11,6 +11,9 @@ REVISION="${2:-}"
 NS="${NAMESPACE:-aceest}"
 TIMEOUT="${ROLLOUT_TIMEOUT:-180s}"
 kc() { kubectl -n "$NS" "$@"; }
+# shellcheck source=lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+require_safe_context
 log() { echo "[rollback] $*"; }
 
 undo() {

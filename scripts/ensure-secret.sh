@@ -8,6 +8,9 @@
 # -----------------------------------------------------------------------------
 set -euo pipefail
 NS="${NAMESPACE:-aceest}"
+# shellcheck source=lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+require_safe_context
 
 random_hex() { head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 
