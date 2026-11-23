@@ -4,6 +4,7 @@ v1.1   - validate a client profile and estimate calories (Aceestver-1.1)
 v1.1.2 - client list, CSV export and adherence chart data (Aceestver-1.1.2)
 v2.0.1 - clients and weekly progress persisted in SQLite (Aceestver-2.0.1)
 v2.1.2 - range validation and JSON error responses
+v2.2.1 - weekly adherence progress chart data (Aceestver-2.2.1)
 """
 import csv
 import io
@@ -141,6 +142,25 @@ def get_client(name):
     if row is None:
         return _error("Client not found", 404)
     return jsonify(_client_dict(row))
+
+
+@bp.get("/<name>/progress")
+def progress_chart(name):
+    """Weekly adherence history (data for the 'Weekly Adherence Progress' line chart)."""
+    if _client_row(name) is None:
+        return _error("Client not found", 404)
+    rows = get_db().execute(
+        "SELECT week, adherence FROM progress WHERE client_name = ? ORDER BY id", (name,)
+    ).fetchall()
+    adherence = [r["adherence"] for r in rows]
+    return jsonify(
+        title=f"Weekly Adherence Progress - {name}",
+        client=name,
+        weeks=[r["week"] for r in rows],
+        adherence=adherence,
+        average=round(sum(adherence) / len(adherence), 1) if adherence else None,
+        y_axis={"label": "Adherence (%)", "min": 0, "max": 100},
+    )
 
 
 @bp.post("/<name>/progress")
