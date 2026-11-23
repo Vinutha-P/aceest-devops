@@ -36,6 +36,7 @@ kc()   { kubectl -n "$NS" "$@"; }
 ensure_strategy() {
   local folder="$1" deployment="$2"
   kubectl apply -f "${K8S_DIR}/namespace.yaml" >/dev/null
+  bash "${SCRIPT_DIR}/ensure-secret.sh"
   if ! kc get deployment "$deployment" >/dev/null 2>&1; then
     log "First deployment of '${folder}' - applying manifests"
     for f in "${K8S_DIR}/${folder}"/*.yaml; do

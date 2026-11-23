@@ -8,6 +8,7 @@ set -euo pipefail
 K8S_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../k8s" && pwd)"
 
 kubectl apply -f "${K8S_DIR}/namespace.yaml"
+bash "${K8S_DIR}/../scripts/ensure-secret.sh"
 for strategy in rolling blue-green canary ab-testing shadow; do
   echo "== ${strategy}"
   for f in "${K8S_DIR}/${strategy}"/*.yaml; do
