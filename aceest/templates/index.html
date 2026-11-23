@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ACEest Fitness & Gym</title>
+  <style>
+    :root { --bg:#1a1a1a; --panel:#262626; --gold:#d4af37; --text:#eeeeee; --muted:#aaaaaa; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Arial, Helvetica, sans-serif; background:var(--bg); color:var(--text); }
+    header { background:var(--gold); color:#000; padding:18px 24px; display:flex;
+             justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+    header h1 { margin:0; font-size:24px; letter-spacing:1px; }
+    .badge { background:#000; color:var(--gold); padding:6px 12px; border-radius:16px; font-size:13px; }
+    main { padding:24px; max-width:1100px; margin:0 auto; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; }
+    .card { background:var(--panel); border-radius:8px; padding:16px; border-top:4px solid var(--gold); }
+    .card h2 { margin-top:0; font-size:18px; }
+    .card h3 { color:var(--gold); font-size:14px; margin-bottom:4px; }
+    ul { margin:0; padding-left:18px; }
+    li { margin:3px 0; }
+    footer { color:var(--muted); font-size:12px; text-align:center; padding:24px; }
+    code { color:var(--gold); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ACEest FUNCTIONAL FITNESS</h1>
+    <span class="badge">v{{ info.version }} &middot; {{ info.track }} &middot; {{ info.pod }}</span>
+  </header>
+  <main>
+    <div class="grid">
+      {% for code, p in programs.items() %}
+      <section class="card" style="border-top-color: {{ p.color }}">
+        <h2>{{ p.name }}</h2>
+        {% if p.desc %}<p>{{ p.desc }}</p>{% endif %}
+        {% if p.workout %}
+        <h3>Weekly Workout</h3>
+        <ul>{% for line in p.workout %}<li>{{ line }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if p.diet %}
+        <h3>Daily Nutrition (Tamil Nadu context)</h3>
+        <ul>{% for line in p.diet %}<li>{{ line }}</li>{% endfor %}</ul>
+        {% endif %}
+      </section>
+      {% endfor %}
+    </div>
+  </main>
+  <footer>API: <code>/api/programs</code> &middot; <code>/health</code> &middot; <code>/version</code></footer>
+</body>
+</html>
