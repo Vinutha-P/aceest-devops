@@ -25,6 +25,96 @@ Follow the steps in order. Each step that differs by operating system shows **Wi
 > project folder → *Open Git Bash here*). Everything else runs in PowerShell.
 > In PowerShell, `curl` means something different, so type **`curl.exe`** instead.
 
+### Doing it in a virtual machine (VM)
+
+To do everything inside a VM, use an **Ubuntu** VM. Do steps VM-1 to VM-5 first, then
+Steps 1–11 below inside the VM, using the **Ubuntu** commands.
+
+**VM-1. Create the VM** (VirtualBox, VMware or Hyper-V):
+
+| Setting | Value |
+|---|---|
+| OS | Ubuntu 22.04 or 24.04 **Desktop**, 64-bit |
+| CPUs | **4** (6 if possible) |
+| RAM | **12 GB** (10 GB minimum: Jenkins, SonarQube and Minikube all run at once) |
+| Disk | **60 GB** |
+| Network | NAT (the default) |
+
+The host computer needs at least 16 GB RAM, and virtualization (VT-x / AMD-V) must be enabled
+in its BIOS.
+
+**VM-2. Install Ubuntu and update it.** Open Terminal with Ctrl+Alt+T:
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git curl unzip
+```
+In VirtualBox, also run Devices → *Insert Guest Additions CD* and reboot. This gives you copy and
+paste and a resizable screen. Then set Devices → Shared Clipboard → *Bidirectional*.
+
+**VM-3. Copy the project into the VM.** Move it as a Git *bundle*, a single file that carries
+every branch and tag. A zip of the folder can lose the hidden `.git` folder. On the host
+computer, in the project folder:
+```bash
+git bundle create aceest-devops.bundle --all
+```
+Copy `aceest-devops.bundle` into the VM. You can use a VirtualBox shared folder, a USB stick,
+or upload it to Google Drive and download it in the VM's Firefox. Then, inside the VM:
+```bash
+git clone ~/Downloads/aceest-devops.bundle ~/aceest-devops
+cd ~/aceest-devops
+for b in $(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin | grep -vx HEAD); do
+  git show-ref -q --verify "refs/heads/$b" || git branch "$b" "origin/$b"
+done
+git checkout main
+git remote remove origin          # step 8 connects your own GitHub repository instead
+git branch                        # must list main + 10 version branches
+git tag -l                        # must show only v1.0
+```
+If `git tag -l` shows more than `v1.0`, delete the extra tags (`git tag -d v1.1`, and so on),
+or step 8 will fail when it creates them.
+
+> Don't `git clone` from GitHub after the pull requests have been merged. `main` would already
+> contain every version, so step 8 would have nothing left to merge.
+
+**VM-4. Take a snapshot** of the VM (VirtualBox: Machine → Take Snapshot). If something breaks
+later, you can go back to it.
+
+**VM-5. Do Steps 1–11 inside the VM, using the Ubuntu commands.** Notes for the VM:
+- After `sudo usermod -aG docker "$USER"` in Step 1, **reboot the VM**. Otherwise Docker says
+  `permission denied`.
+- Open the web pages in the VM's Firefox: http://localhost:5000, http://localhost:8080 (Jenkins)
+  and http://localhost:9000 (SonarQube).
+- In Step 9 no `minikube tunnel` is needed. The cluster URL is `http://$(minikube ip)`.
+- In Step 11, the public URL is `ngrok http $(minikube ip):80` (install it with `sudo snap install ngrok`).
+
+**Optional: open Jenkins and SonarQube from the host computer.**
+- **VirtualBox (NAT):** go to Settings → Network → Advanced → Port Forwarding. Add host 8080 →
+  guest 8080 and host 9000 → guest 9000, then open http://localhost:8080 on the host.
+- **Bridged network:** run `hostname -I` in the VM, then open `http://<vm-ip>:8080` on the host.
+
+**After restarting the VM:**
+```bash
+cd ~/aceest-devops
+minikube start
+docker start jenkins sonarqube
+scripts/jenkins-kubeconfig.sh     # only if `minikube ip` changed; then re-upload the kubeconfig credential
+```
+
+**VM problems:**
+
+| Problem | Fix |
+|---|---|
+| `permission denied ... docker.sock` | Reboot the VM after `usermod -aG docker` |
+| SonarQube stops after a minute | The VM needs more RAM: 12 GB, and close other apps |
+| `minikube start` fails on memory | Use `--memory=3g`, or give the VM more RAM |
+| VM is very slow / "VT-x is not available" | Enable virtualization in the host BIOS. On Windows hosts, turn off *Memory integrity* (Core isolation) for VirtualBox |
+| Disk full | `docker system prune -a` |
+
+> **Windows VM instead of Ubuntu:** Docker Desktop needs *nested virtualization*. On a Hyper-V
+> host, run `Set-VMProcessor -VMName <vm> -ExposeVirtualizationExtensions $true` while the VM is
+> off. In VMware, tick *Virtualize Intel VT-x/EPT*. VirtualBox is unreliable for this, so use
+> Ubuntu there. Then follow the Windows commands in Steps 1–11.
+
 ### Step 1: Install the tools
 
 You need Git, Python 3.12, Docker, kubectl, Minikube and the GitHub CLI. Give Docker at
@@ -212,7 +302,7 @@ for i in $(seq 1 20); do curl -s $URL/canary/version; echo; done   # roughly 80 
 curl -H "X-Variant: B" $URL/ab/version            # A/B testing: variant B
 curl $URL/shadow/version                          # shadow: users only see the primary
 kubectl -n aceest logs deploy/aceest-shadow-new --tail=5           # requests mirrored to the shadow
-scripts/demo-strategies.sh                        # saves everything to docs/evidence/
+BASE_URL=$URL scripts/demo-strategies.sh         # saves everything to docs/evidence/
 ```
 
 ### Step 10: Test rollback
