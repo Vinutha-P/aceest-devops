@@ -126,3 +126,24 @@ def test_unhandled_exception_returns_json_500(tmp_path):
     body = response.get_json()
     assert body["error"] == "Internal Server Error"
     assert "kaboom" not in str(body)  # internal details are not leaked
+
+
+class TestIsoDate:
+    def test_valid_date_is_normalised(self):
+        from aceest.validation import iso_date
+        assert iso_date({"d": "2026-03-05"}, "d") == "2026-03-05"
+
+    def test_default_used_when_missing(self):
+        from aceest.validation import iso_date
+        assert iso_date({}, "d", default="2026-01-01") == "2026-01-01"
+
+    def test_required_without_default(self):
+        from aceest.validation import iso_date
+        with pytest.raises(ValidationError, match="required"):
+            iso_date({}, "d")
+
+    @pytest.mark.parametrize("raw", ["2026-13-01", "05/03/2026", "yesterday"])
+    def test_invalid_dates(self, raw):
+        from aceest.validation import iso_date
+        with pytest.raises(ValidationError, match="YYYY-MM-DD"):
+            iso_date({"d": raw}, "d")

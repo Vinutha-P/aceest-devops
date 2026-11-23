@@ -20,7 +20,7 @@ def test_every_program_has_a_calorie_factor():
 def test_calorie_endpoint(client):
     data = client.get("/api/programs/mg/calories?weight=80").get_json()
     assert data == {
-        "program": "Muscle Gain (MG)",
+        "program": "Muscle Gain (MG) - PPL",
         "weight": 80.0,
         "calorie_factor": 35,
         "calories": 2800,
