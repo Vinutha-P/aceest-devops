@@ -1,0 +1,38 @@
+---
+# LIVE service. Switch traffic by changing spec.selector.color (blue <-> green).
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-bluegreen
+  namespace: aceest
+  labels:
+    app: aceest
+spec:
+  type: ClusterIP
+  selector:
+    app: aceest
+    strategy: blue-green
+    color: blue
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# PREVIEW service - always points at the idle colour for smoke tests.
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-bluegreen-preview
+  namespace: aceest
+  labels:
+    app: aceest
+spec:
+  type: ClusterIP
+  selector:
+    app: aceest
+    strategy: blue-green
+    color: green
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

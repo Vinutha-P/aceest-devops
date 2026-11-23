@@ -1,0 +1,36 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-shadow-primary
+  namespace: aceest
+  labels:
+    app: aceest
+spec:
+  type: ClusterIP
+  selector:
+    app: aceest
+    strategy: shadow
+    track: primary
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-shadow-new
+  namespace: aceest
+  labels:
+    app: aceest
+spec:
+  type: ClusterIP
+  selector:
+    app: aceest
+    strategy: shadow
+    track: shadow
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

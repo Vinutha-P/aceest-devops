@@ -1,0 +1,95 @@
+---
+# Rolling update: pods are replaced one at a time (maxSurge 1 / maxUnavailable 0).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-rolling
+  namespace: aceest
+  labels:
+    app: aceest
+    strategy: rolling
+  annotations:
+    kubernetes.io/change-cause: "initial deploy your-dockerhub-username/aceest-fitness:3.0.1"
+spec:
+  replicas: 3
+  revisionHistoryLimit: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1          # at most one extra pod during the update
+      maxUnavailable: 0    # never drop below the desired replica count -> zero downtime
+  minReadySeconds: 5
+  selector:
+    matchLabels:
+      app: aceest
+      strategy: rolling
+  template:
+    metadata:
+      labels:
+        app: aceest
+        strategy: rolling
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: your-dockerhub-username/aceest-fitness:3.0.1
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 5000
+          env:
+            - name: DEPLOYMENT_TRACK
+              value: "stable"
+            - name: URL_PREFIX
+              value: "/rolling"
+            - name: ACEEST_DB
+              value: /data/aceest_fitness.db
+            - name: GUNICORN_WORKERS
+              value: "2"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]   # let the ingress stop sending traffic first
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

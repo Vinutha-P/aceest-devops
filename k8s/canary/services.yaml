@@ -1,0 +1,36 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-canary-stable
+  namespace: aceest
+  labels:
+    app: aceest
+spec:
+  type: ClusterIP
+  selector:
+    app: aceest
+    strategy: canary
+    track: stable
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-canary-new
+  namespace: aceest
+  labels:
+    app: aceest
+spec:
+  type: ClusterIP
+  selector:
+    app: aceest
+    strategy: canary
+    track: canary
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

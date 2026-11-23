@@ -1,0 +1,21 @@
+---
+# Users get the primary's response; nginx mirrors each request to the shadow service.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aceest-shadow
+  namespace: aceest
+  annotations:
+    nginx.ingress.kubernetes.io/mirror-target: "http://aceest-shadow-new.aceest.svc.cluster.local$request_uri"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /shadow
+            pathType: Prefix
+            backend:
+              service:
+                name: aceest-shadow-primary
+                port:
+                  number: 80
