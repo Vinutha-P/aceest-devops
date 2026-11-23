@@ -12,9 +12,11 @@ REQUESTS="${REQUESTS:-20}"
 OUT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/docs/evidence"
 mkdir -p "$OUT_DIR"
 OUT="${OUT_DIR}/strategies-$(date +%Y%m%d-%H%M%S).txt"
+# python3 on macOS/Ubuntu, python on Windows (Git Bash)
+PY=python3; "$PY" -c "" 2>/dev/null || PY=python
 
 version_of() {  # prints "version track" for one request
-  curl -s "$@" | python -c "import json,sys; d=json.load(sys.stdin); print(d['version'], d['track'])" \
+  curl -s "$@" | "$PY" -c "import json,sys; d=json.load(sys.stdin); print(d['version'], d['track'])" \
     2>/dev/null || echo "ERROR"
 }
 

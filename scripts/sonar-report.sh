@@ -12,6 +12,8 @@ PROJECT="${SONAR_PROJECT:-aceest-fitness}"
 OUT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/docs/evidence"
 mkdir -p "$OUT_DIR"
 TMP="$(mktemp -d)"
+# python3 on macOS/Ubuntu, python on Windows (Git Bash)
+PY=python3; "$PY" -c "" 2>/dev/null || PY=python
 
 api() { curl -fsS -u "${SONAR_TOKEN}:" "${SONAR_URL}$1"; }
 
@@ -20,7 +22,7 @@ api "/api/measures/component?component=${PROJECT}&metricKeys=${METRICS}" > "$TMP
 api "/api/qualitygates/project_status?projectKey=${PROJECT}" > "$TMP/gate.json"
 api "/api/project_analyses/search?project=${PROJECT}&ps=10" > "$TMP/analyses.json"
 
-python - "$TMP" "$OUT_DIR/sonarqube-report.md" "$SONAR_URL" "$PROJECT" <<'PY'
+"$PY" - "$TMP" "$OUT_DIR/sonarqube-report.md" "$SONAR_URL" "$PROJECT" <<'PY'
 import json, sys, datetime, pathlib
 tmp, out, url, project = sys.argv[1:5]
 load = lambda n: json.loads(pathlib.Path(tmp, n).read_text())
