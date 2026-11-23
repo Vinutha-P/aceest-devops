@@ -53,6 +53,8 @@ def build_report(client, progress, workouts, generated_by):
         ("Weight", _show(client["weight"], " kg")),
         ("Program", program.get("name", client["program"])),
         ("Calories", _show(client["calories"], " kcal/day")),
+        ("Membership", _show(client["membership_status"])),
+        ("Membership Expiry", _show(client["membership_end"])),
     ])
 
     bmi_text = "-"

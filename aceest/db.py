@@ -2,6 +2,7 @@
 
 v2.0.1 - clients + weekly progress (Aceestver-2.0.1)
 v2.2.4 - extended client profile, workouts, exercises and body metrics (Aceestver-2.2.4)
+v3.2.4 - membership status / end date (Aceestver-3.2.4)
 
 One connection per request is stored on ``flask.g`` and closed on teardown.
 The database path comes from ``app.config["DATABASE"]`` (env var ``ACEEST_DB``).
@@ -23,7 +24,9 @@ SCHEMA = [
         notes TEXT DEFAULT '',
         height REAL,
         target_weight REAL,
-        target_adherence INTEGER
+        target_adherence INTEGER,
+        membership_status TEXT,
+        membership_end TEXT
     )
     """,
     """
@@ -74,6 +77,8 @@ MIGRATIONS = [
     ("clients", "height", "ALTER TABLE clients ADD COLUMN height REAL"),
     ("clients", "target_weight", "ALTER TABLE clients ADD COLUMN target_weight REAL"),
     ("clients", "target_adherence", "ALTER TABLE clients ADD COLUMN target_adherence INTEGER"),
+    ("clients", "membership_status", "ALTER TABLE clients ADD COLUMN membership_status TEXT"),
+    ("clients", "membership_end", "ALTER TABLE clients ADD COLUMN membership_end TEXT"),
 ]
 
 

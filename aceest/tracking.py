@@ -196,4 +196,6 @@ def client_summary(name):
         progress={"weeks_logged": weeks, "average_adherence": round(avg, 1) if avg else 0},
         workouts={"sessions": workouts[0], "total_minutes": workouts[1]},
         last_body_metrics=dict(last_metric) if last_metric else None,
+        membership={"status": client["membership_status"] or "None",
+                    "end": client["membership_end"]},
     )

@@ -17,6 +17,11 @@
     .card { background:var(--panel); border-radius:8px; padding:16px; border-top:4px solid var(--gold); }
     .card h2 { margin-top:0; font-size:18px; }
     .card h3 { color:var(--gold); font-size:14px; margin-bottom:4px; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:16px;
+             margin-bottom:20px; }
+    .stat { background:var(--panel); border-radius:8px; padding:14px; text-align:center; }
+    .stat b { display:block; font-size:28px; color:var(--gold); }
+    .stat span { color:var(--muted); font-size:13px; }
     ul { margin:0; padding-left:18px; }
     li { margin:3px 0; }
     footer { color:var(--muted); font-size:12px; text-align:center; padding:24px; }
@@ -29,6 +34,12 @@
     <span class="badge">v{{ info.version }} &middot; {{ info.track }} &middot; {{ info.pod }}</span>
   </header>
   <main>
+    <div class="stats">
+      <div class="stat"><b>{{ stats.clients }}</b><span>Clients</span></div>
+      <div class="stat"><b>{{ stats.active_members }}</b><span>Active memberships</span></div>
+      <div class="stat"><b>{{ stats.workouts }}</b><span>Workouts logged</span></div>
+      <div class="stat"><b>v{{ info.version }}</b><span>{{ info.track }} track</span></div>
+    </div>
     <div class="grid">
       {% for code, p in programs.items() %}
       <section class="card" style="border-top-color: {{ p.color }}">
@@ -47,6 +58,10 @@
       {% endfor %}
     </div>
   </main>
-  <footer>API: <code>/api/programs</code> &middot; <code>/health</code> &middot; <code>/version</code></footer>
+  <footer>
+    API: <code>/api/programs</code> &middot; <code>/api/clients</code> &middot;
+    <code>/api/auth/login</code> &middot; <code>/health</code> &middot; <code>/ready</code> &middot;
+    <code>/version</code> &mdash; see README for the full reference
+  </footer>
 </body>
 </html>

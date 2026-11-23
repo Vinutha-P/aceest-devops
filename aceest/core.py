@@ -6,6 +6,7 @@
 """
 import socket
 import sqlite3
+from datetime import date
 
 from flask import Blueprint, current_app, jsonify, render_template
 
@@ -34,9 +35,21 @@ def add_deployment_headers(response):
     return response
 
 
+def dashboard_stats():
+    db = get_db()
+    today = date.today().isoformat()
+    return {
+        "clients": db.execute("SELECT COUNT(*) FROM clients").fetchone()[0],
+        "active_members": db.execute(
+            "SELECT COUNT(*) FROM clients WHERE membership_end >= ?", (today,)).fetchone()[0],
+        "workouts": db.execute("SELECT COUNT(*) FROM workouts").fetchone()[0],
+    }
+
+
 @bp.get("/")
 def index():
-    return render_template("index.html", info=version_info(), programs=PROGRAMS)
+    return render_template("index.html", info=version_info(), programs=PROGRAMS,
+                           stats=dashboard_stats())
 
 
 @bp.get("/health")
