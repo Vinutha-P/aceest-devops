@@ -1,6 +1,7 @@
-// ACEest Fitness & Gym - CI pipeline
+// ACEest Fitness & Gym - CI/CD pipeline
 // Checkout -> Setup -> Lint -> Unit tests -> SonarQube + Quality Gate
-//          -> Docker build -> Tests inside container -> Push to Docker Hub -> Archive
+//          -> Docker build -> Tests inside container -> Push to Docker Hub
+//          -> Deploy to Kubernetes (chosen strategy, smoke test, auto-rollback) -> Archive
 pipeline {
     agent any
 
@@ -8,6 +9,14 @@ pipeline {
         timestamps()
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+
+    parameters {
+        choice(name: 'DEPLOY_STRATEGY',
+               choices: ['rolling', 'blue-green', 'canary', 'canary-promote', 'ab', 'shadow', 'none'],
+               description: 'Kubernetes deployment strategy (automatic SCM-triggered builds use rolling)')
+        string(name: 'CANARY_WEIGHT', defaultValue: '20',
+               description: 'Percentage of /canary traffic sent to the new version')
     }
 
     // Jenkins polls GitHub every ~2 minutes and builds automatically on new commits
@@ -144,6 +153,21 @@ pipeline {
                         docker tag ${IMAGE_REPO}:${IMAGE_TAG} ${IMAGE_REPO}:latest
                         docker push ${IMAGE_REPO}:latest
                     '''
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            when { expression { (params.DEPLOY_STRATEGY ?: 'rolling') != 'none' } }
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                    sh """
+                        chmod +x scripts/*.sh
+                        CANARY_WEIGHT=${params.CANARY_WEIGHT ?: '20'} \
+                        scripts/deploy.sh ${params.DEPLOY_STRATEGY ?: 'rolling'} \
+                            ${env.IMAGE_REPO}:${env.IMAGE_TAG}-b${env.BUILD_NUMBER}
+                        kubectl -n aceest get deployments -o wide
+                    """
                 }
             }
         }

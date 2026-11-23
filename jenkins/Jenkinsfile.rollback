@@ -1,0 +1,33 @@
+// ACEest - manual rollback job ("aceest-rollback" pipeline in Jenkins)
+// Reverts a deployment strategy to its last stable version.
+pipeline {
+    agent any
+    options { timestamps() }
+
+    parameters {
+        choice(name: 'STRATEGY', choices: ['rolling', 'blue-green', 'canary', 'ab', 'shadow'],
+               description: 'Which deployment to roll back')
+        string(name: 'REVISION', defaultValue: '',
+               description: 'Optional revision number (blank = previous revision)')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+        stage('Rollback') {
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                    sh 'chmod +x scripts/*.sh && scripts/rollback.sh "$STRATEGY" "$REVISION"'
+                }
+            }
+        }
+        stage('Verify') {
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                    sh 'kubectl -n aceest get deployments -o wide'
+                }
+            }
+        }
+    }
+}
