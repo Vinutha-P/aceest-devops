@@ -38,6 +38,7 @@
         <h3>Weekly Workout</h3>
         <ul>{% for line in p.workout %}<li>{{ line }}</li>{% endfor %}</ul>
         {% endif %}
+        {% if p.calorie_factor %}<p>Calorie factor: <strong>{{ p.calorie_factor }}</strong> kcal per kg body weight</p>{% endif %}
         {% if p.diet %}
         <h3>Daily Nutrition (Tamil Nadu context)</h3>
         <ul>{% for line in p.diet %}<li>{{ line }}</li>{% endfor %}</ul>

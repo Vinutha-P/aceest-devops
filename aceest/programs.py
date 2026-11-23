@@ -1,23 +1,24 @@
-"""Training program catalogue (ported from Aceestver-1.0)."""
-from flask import Blueprint, abort, jsonify
+"""Training program catalogue (Aceestver-1.0) with calorie factors (Aceestver-1.1)."""
+from flask import Blueprint, abort, jsonify, request
 
 PROGRAMS = {
     "FL": {
         "name": "Fat Loss (FL)",
         "workout": [
-            "Mon: 5x5 Back Squat + AMRAP",
+            "Mon: Back Squat 5x5 + Core",
             "Tue: EMOM 20min Assault Bike",
             "Wed: Bench Press + 21-15-9",
-            "Thu: 10RFT Deadlifts/Box Jumps",
-            "Fri: 30min Active Recovery",
+            "Thu: Deadlift + Box Jumps",
+            "Fri: Zone 2 Cardio 30min",
         ],
         "diet": [
-            "B: 3 Egg Whites + Oats Idli",
-            "L: Grilled Chicken + Brown Rice",
-            "D: Fish Curry + Millet Roti",
-            "Target: 2,000 kcal",
+            "Breakfast: Egg Whites + Oats",
+            "Lunch: Grilled Chicken + Brown Rice",
+            "Dinner: Fish Curry + Millet Roti",
+            "Target: ~2000 kcal",
         ],
         "color": "#e74c3c",
+        "calorie_factor": 22,
     },
     "MG": {
         "name": "Muscle Gain (MG)",
@@ -30,30 +31,38 @@ PROGRAMS = {
             "Sat: Barbell Rows 4x10",
         ],
         "diet": [
-            "B: 4 Eggs + PB Oats",
-            "L: Chicken Biryani (250g Chicken)",
-            "D: Mutton Curry + Jeera Rice",
-            "Target: 3,200 kcal",
+            "Breakfast: Eggs + Peanut Butter Oats",
+            "Lunch: Chicken Biryani",
+            "Dinner: Mutton Curry + Rice",
+            "Target: ~3200 kcal",
         ],
         "color": "#2ecc71",
+        "calorie_factor": 35,
     },
     "BG": {
         "name": "Beginner (BG)",
         "workout": [
-            "Circuit Training: Air Squats, Ring Rows, Push-ups",
-            "Focus: Technique Mastery & Form (90% Threshold)",
+            "Full Body Circuit: Air Squats, Ring Rows, Push-ups",
+            "Focus: Technique & Consistency",
         ],
         "diet": [
-            "Balanced Tamil Meals: Idli-Sambar, Rice-Dal, Chapati",
-            "Protein: 120g/day",
+            "Balanced Tamil Meals",
+            "Idli / Dosa / Rice + Dal",
+            "Protein Target: 120g/day",
         ],
         "color": "#3498db",
+        "calorie_factor": 26,
     },
 }
 
 SITE_METRICS = {"capacity_users": 150, "area_sq_ft": 10000, "break_even_members": 250}
 
 bp = Blueprint("programs", __name__, url_prefix="/api/programs")
+
+
+def estimate_calories(weight_kg, code):
+    """Daily calorie estimate = body weight (kg) x program calorie factor."""
+    return int(weight_kg * PROGRAMS[code]["calorie_factor"])
 
 
 def get_program_or_404(code):
@@ -75,3 +84,20 @@ def list_programs():
 def program_detail(code):
     program = get_program_or_404(code)
     return jsonify(code=code.upper(), **program)
+
+
+@bp.get("/<code>/calories")
+def program_calories(code):
+    program = get_program_or_404(code)
+    try:
+        weight = float(request.args.get("weight", ""))
+    except ValueError:
+        abort(400, description="Query parameter 'weight' must be a number")
+    if weight <= 0:
+        abort(400, description="Query parameter 'weight' must be greater than 0")
+    return jsonify(
+        program=program["name"],
+        weight=weight,
+        calorie_factor=program["calorie_factor"],
+        calories=estimate_calories(weight, code.upper()),
+    )

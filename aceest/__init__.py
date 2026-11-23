@@ -17,8 +17,9 @@ def create_app(test_config=None):
     if test_config:
         app.config.update(test_config)
 
-    from . import core, programs
+    from . import clients, core, programs
 
     app.register_blueprint(core.bp)
     app.register_blueprint(programs.bp)
+    app.register_blueprint(clients.bp)
     return app
