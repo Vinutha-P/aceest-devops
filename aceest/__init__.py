@@ -19,11 +19,12 @@ def create_app(test_config=None):
     if test_config:
         app.config.update(test_config)
 
-    from . import clients, core, db, errors, programs
+    from . import clients, core, db, errors, programs, tracking
 
     db.init_app(app)
     errors.register_error_handlers(app)
     app.register_blueprint(core.bp)
     app.register_blueprint(programs.bp)
     app.register_blueprint(clients.bp)
+    app.register_blueprint(tracking.bp)
     return app

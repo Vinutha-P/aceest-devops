@@ -5,6 +5,7 @@ v1.1.2 - client list, CSV export and adherence chart data (Aceestver-1.1.2)
 v2.0.1 - clients and weekly progress persisted in SQLite (Aceestver-2.0.1)
 v2.1.2 - range validation and JSON error responses
 v2.2.1 - weekly adherence progress chart data (Aceestver-2.2.1)
+v2.2.4 - height and goals (target weight / adherence) on the profile (Aceestver-2.2.4)
 """
 import csv
 import io
@@ -14,7 +15,9 @@ from flask import Blueprint, Response, jsonify, request
 
 from .db import get_db
 from .programs import PROGRAMS, estimate_calories
-from .validation import AGE_RANGE, PERCENT_RANGE, WEIGHT_RANGE, json_body, number, text
+from .validation import (
+    AGE_RANGE, HEIGHT_RANGE, PERCENT_RANGE, WEIGHT_RANGE, json_body, number, text,
+)
 
 bp = Blueprint("clients", __name__, url_prefix="/api/clients")
 
@@ -73,6 +76,9 @@ def save_client():
     weight = number(data, "weight", float, default=0.0, **WEIGHT_RANGE)
     adherence = number(data, "adherence", int, **PERCENT_RANGE)
     notes = text(data, "notes", max_length=500)
+    height = number(data, "height", float, **HEIGHT_RANGE)
+    target_weight = number(data, "target_weight", float, **WEIGHT_RANGE)
+    target_adherence = number(data, "target_adherence", int, **PERCENT_RANGE)
 
     calories = estimate_calories(weight, program) if weight > 0 else None
     existed = _client_row(name) is not None
@@ -80,13 +86,17 @@ def save_client():
     db = get_db()
     db.execute(
         """
-        INSERT INTO clients (name, age, weight, program, calories, notes)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO clients (name, age, height, weight, program, calories, notes,
+                             target_weight, target_adherence)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(name) DO UPDATE SET
-            age = excluded.age, weight = excluded.weight, program = excluded.program,
-            calories = excluded.calories, notes = excluded.notes
+            age = excluded.age, height = excluded.height, weight = excluded.weight,
+            program = excluded.program, calories = excluded.calories, notes = excluded.notes,
+            target_weight = excluded.target_weight,
+            target_adherence = excluded.target_adherence
         """,
-        (name, age, weight, program, calories, notes),
+        (name, age or None, height or None, weight or None, program, calories, notes,
+         target_weight or None, target_adherence or None),
     )
     db.commit()
     if adherence is not None:

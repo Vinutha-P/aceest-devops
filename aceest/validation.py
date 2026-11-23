@@ -3,6 +3,7 @@
 Raising :class:`ValidationError` anywhere in a view produces a JSON 400 response
 (see :mod:`aceest.errors`).
 """
+from datetime import date
 
 MAX_NAME_LENGTH = 100
 
@@ -50,4 +51,20 @@ def number(data, field, cast=float, minimum=None, maximum=None, required=False, 
 # Ranges shared by the client, progress and metrics APIs
 AGE_RANGE = {"minimum": 0, "maximum": 120}
 WEIGHT_RANGE = {"minimum": 0, "maximum": 400}
+HEIGHT_RANGE = {"minimum": 0, "maximum": 250}
+DURATION_RANGE = {"minimum": 0, "maximum": 600}
+COUNT_RANGE = {"minimum": 0, "maximum": 1000}
 PERCENT_RANGE = {"minimum": 0, "maximum": 100}
+
+
+def iso_date(data, field, default=None):
+    """Validate a YYYY-MM-DD date string (returns ``default`` when missing)."""
+    value = text(data, field, max_length=10)
+    if not value:
+        if default is None:
+            raise ValidationError(f"'{field}' is required")
+        return default
+    try:
+        return date.fromisoformat(value).isoformat()
+    except ValueError:
+        raise ValidationError(f"'{field}' must be a date in YYYY-MM-DD format") from None

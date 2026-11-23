@@ -1,9 +1,13 @@
-"""Training program catalogue (Aceestver-1.0) with calorie factors (Aceestver-1.1)."""
+"""Training program catalogue.
+
+v1.0 catalogue (FL/MG/BG), v1.1 calorie factors, v2.2.4 program variants + descriptions.
+"""
 from flask import Blueprint, abort, jsonify, request
 
 PROGRAMS = {
     "FL": {
-        "name": "Fat Loss (FL)",
+        "name": "Fat Loss (FL) - 3 day",
+        "desc": "3-day full-body fat loss",
         "workout": [
             "Mon: Back Squat 5x5 + Core",
             "Tue: EMOM 20min Assault Bike",
@@ -20,8 +24,28 @@ PROGRAMS = {
         "color": "#e74c3c",
         "calorie_factor": 22,
     },
+    "FL5": {
+        "name": "Fat Loss (FL) - 5 day",
+        "desc": "5-day split, higher volume fat loss",
+        "workout": [
+            "Mon: Upper Body Strength + Core",
+            "Tue: HIIT Intervals 25min",
+            "Wed: Lower Body Strength",
+            "Thu: Metabolic Conditioning Circuit",
+            "Fri: Full Body + Zone 2 Cardio 30min",
+        ],
+        "diet": [
+            "Breakfast: Egg Whites + Oats",
+            "Lunch: Grilled Chicken + Brown Rice",
+            "Dinner: Fish Curry + Millet Roti",
+            "Target: ~2100 kcal",
+        ],
+        "color": "#e67e22",
+        "calorie_factor": 24,
+    },
     "MG": {
-        "name": "Muscle Gain (MG)",
+        "name": "Muscle Gain (MG) - PPL",
+        "desc": "Push/Pull/Legs hypertrophy",
         "workout": [
             "Mon: Squat 5x5",
             "Tue: Bench 5x5",
@@ -41,6 +65,7 @@ PROGRAMS = {
     },
     "BG": {
         "name": "Beginner (BG)",
+        "desc": "3-day simple beginner full-body",
         "workout": [
             "Full Body Circuit: Air Squats, Ring Rows, Push-ups",
             "Focus: Technique & Consistency",
@@ -75,7 +100,9 @@ def get_program_or_404(code):
 @bp.get("")
 def list_programs():
     return jsonify(
-        programs=[{"code": code, "name": p["name"]} for code, p in PROGRAMS.items()],
+        programs=[
+            {"code": code, "name": p["name"], "desc": p["desc"]} for code, p in PROGRAMS.items()
+        ],
         site_metrics=SITE_METRICS,
     )
 
