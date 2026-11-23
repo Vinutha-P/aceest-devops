@@ -7,11 +7,25 @@ import pytest
 
 from aceest import create_app
 
+ADMIN_PASSWORD = "test-admin-password"
+
+
+def make_config(tmp_path, **overrides):
+    config = {
+        "TESTING": True,
+        "DATABASE": str(tmp_path / "test.db"),
+        "SECRET_KEY": "test-secret-key",
+        "ADMIN_PASSWORD": ADMIN_PASSWORD,
+        # fast hashing keeps the suite quick; production uses scrypt (the default)
+        "PASSWORD_HASH_METHOD": "pbkdf2:sha256:1000",
+    }
+    config.update(overrides)
+    return config
+
 
 @pytest.fixture
 def app(tmp_path):
-    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "test.db")})
-    yield app
+    yield create_app(make_config(tmp_path))
 
 
 @pytest.fixture
@@ -31,3 +45,21 @@ def make_client(client):
         return response.get_json()
 
     return _make
+
+
+@pytest.fixture
+def login(client):
+    """Log in and return the Authorization header."""
+
+    def _login(username="admin", password=ADMIN_PASSWORD):
+        response = client.post("/api/auth/login",
+                               json={"username": username, "password": password})
+        assert response.status_code == 200, response.get_json()
+        return {"Authorization": f"Bearer {response.get_json()['token']}"}
+
+    return _login
+
+
+@pytest.fixture
+def admin_headers(login):
+    return login()
