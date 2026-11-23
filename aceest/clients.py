@@ -1,32 +1,64 @@
 """Client profile API.
 
 v1.1   - validate a client profile and estimate calories (Aceestver-1.1)
-v1.1.2 - keep a list of clients, CSV export and adherence chart data (Aceestver-1.1.2)
+v1.1.2 - client list, CSV export and adherence chart data (Aceestver-1.1.2)
+v2.0.1 - clients and weekly progress persisted in SQLite (Aceestver-2.0.1)
 """
 import csv
 import io
+from datetime import datetime
 
-from flask import Blueprint, Response, current_app, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 
+from .db import get_db
 from .programs import PROGRAMS, estimate_calories
 
 bp = Blueprint("clients", __name__, url_prefix="/api/clients")
 
-CSV_HEADER = ["Name", "Age", "Weight", "Program", "Adherence", "Notes"]
+CSV_HEADER = ["Name", "Age", "Weight", "Program", "Calories", "Latest Adherence", "Notes"]
 
 
 def _error(message, status=400):
     return jsonify(error=message), status
 
 
-def _store():
-    """In-memory client store (one per application instance)."""
-    return current_app.extensions.setdefault("aceest_clients", [])
+def current_week_label(now=None):
+    """Same label format as the desktop app, e.g. 'Week 07 - 2026'."""
+    return (now or datetime.now()).strftime("Week %U - %Y")
+
+
+def _client_row(name):
+    return get_db().execute("SELECT * FROM clients WHERE name = ?", (name,)).fetchone()
+
+
+def _latest_adherence(name):
+    row = get_db().execute(
+        "SELECT adherence FROM progress WHERE client_name = ? ORDER BY id DESC LIMIT 1", (name,)
+    ).fetchone()
+    return row["adherence"] if row else None
+
+
+def _client_dict(row):
+    client = dict(row)
+    client.pop("id", None)
+    client["latest_adherence"] = _latest_adherence(row["name"])
+    return client
+
+
+def _log_progress(name, adherence, week=None):
+    db = get_db()
+    week = week or current_week_label()
+    db.execute(
+        "INSERT INTO progress (client_name, week, adherence) VALUES (?, ?, ?)",
+        (name, week, adherence),
+    )
+    db.commit()
+    return week
 
 
 @bp.post("")
 def save_client():
-    """Validate a client profile, store it and return it with the calorie estimate."""
+    """Create or update a client (upsert by name) and return it with the calorie estimate."""
     data = request.get_json(silent=True) or {}
     name = str(data.get("name", "")).strip()
     program = str(data.get("program", "")).strip().upper()
@@ -37,41 +69,54 @@ def save_client():
     try:
         age = int(data.get("age", 0))
         weight = float(data.get("weight", 0))
-        adherence = int(data.get("adherence", 0))
+        adherence = int(data["adherence"]) if data.get("adherence") is not None else None
     except (TypeError, ValueError):
         return _error("age, weight and adherence must be numbers")
 
-    client = {
-        "name": name,
-        "age": age,
-        "weight": weight,
-        "program": program,
-        "adherence": adherence,
-        "notes": str(data.get("notes", "")).strip(),
-        "calories": estimate_calories(weight, program) if weight > 0 else None,
-    }
-    _store().append(client)
-    return jsonify(message=f"Client {name} saved successfully.", client=client), 201
+    calories = estimate_calories(weight, program) if weight > 0 else None
+    notes = str(data.get("notes", "")).strip()
+    existed = _client_row(name) is not None
+
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO clients (name, age, weight, program, calories, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(name) DO UPDATE SET
+            age = excluded.age, weight = excluded.weight, program = excluded.program,
+            calories = excluded.calories, notes = excluded.notes
+        """,
+        (name, age, weight, program, calories, notes),
+    )
+    db.commit()
+    if adherence is not None:
+        _log_progress(name, adherence)
+
+    saved = _client_dict(_client_row(name))
+    status = 200 if existed else 201
+    return jsonify(message=f"Client {name} saved successfully.", client=saved), status
 
 
 @bp.get("")
 def list_clients():
-    clients = _store()
+    rows = get_db().execute("SELECT * FROM clients ORDER BY id").fetchall()
+    clients = [_client_dict(r) for r in rows]
     return jsonify(count=len(clients), clients=clients)
 
 
 @bp.get("/export.csv")
 def export_csv():
-    clients = _store()
-    if not clients:
+    rows = get_db().execute("SELECT * FROM clients ORDER BY id").fetchall()
+    if not rows:
         return _error("No clients to export.", 404)
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(CSV_HEADER)
-    for c in clients:
-        writer.writerow(
-            [c["name"], c["age"], c["weight"], c["program"], c["adherence"], c["notes"]]
-        )
+    for r in rows:
+        writer.writerow([
+            r["name"], r["age"], r["weight"], r["program"], r["calories"],
+            _latest_adherence(r["name"]), r["notes"],
+        ])
     return Response(
         buffer.getvalue(),
         mimetype="text/csv",
@@ -81,10 +126,34 @@ def export_csv():
 
 @bp.get("/chart")
 def adherence_chart():
-    """Data for the 'Client Progress' bar chart (adherence % per client)."""
-    clients = _store()
+    """Data for the 'Client Progress' bar chart (latest adherence % per client)."""
+    rows = get_db().execute("SELECT name FROM clients ORDER BY id").fetchall()
+    names = [r["name"] for r in rows]
     return jsonify(
         title="Client Progress",
-        labels=[c["name"] for c in clients],
-        adherence=[c["adherence"] for c in clients],
+        labels=names,
+        adherence=[_latest_adherence(n) or 0 for n in names],
     )
+
+
+@bp.get("/<name>")
+def get_client(name):
+    row = _client_row(name)
+    if row is None:
+        return _error("Client not found", 404)
+    return jsonify(_client_dict(row))
+
+
+@bp.post("/<name>/progress")
+def save_progress(name):
+    """Log weekly adherence for a client."""
+    if _client_row(name) is None:
+        return _error("Client not found", 404)
+    data = request.get_json(silent=True) or {}
+    try:
+        adherence = int(data["adherence"])
+    except (KeyError, TypeError, ValueError):
+        return _error("adherence (number) is required")
+    week = _log_progress(name, adherence, data.get("week"))
+    return jsonify(message="Weekly progress logged", client=name, week=week,
+                   adherence=adherence), 201

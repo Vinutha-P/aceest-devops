@@ -13,12 +13,15 @@ def create_app(test_config=None):
     app = Flask(__name__)
     app.config.from_mapping(
         DEPLOYMENT_TRACK=os.environ.get("DEPLOYMENT_TRACK", "stable"),
+        DATABASE=os.environ.get("ACEEST_DB")
+        or os.path.join(app.instance_path, "aceest_fitness.db"),
     )
     if test_config:
         app.config.update(test_config)
 
-    from . import clients, core, programs
+    from . import clients, core, db, programs
 
+    db.init_app(app)
     app.register_blueprint(core.bp)
     app.register_blueprint(programs.bp)
     app.register_blueprint(clients.bp)
